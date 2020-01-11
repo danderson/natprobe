@@ -43,9 +43,9 @@ func (r *Result) String() string {
 	b.WriteString("Mapping probes:\n")
 	for _, probe := range r.MappingProbes {
 		if probe.Timeout {
-			fmt.Fprintf(&b, "  %s -> ??? -> %s (timeout)\n", probe.Local, probe.Remote)
+			fmt.Fprintf(&b, "    %s -> ??? -> %s (timeout)\n", probe.Local, probe.Remote)
 		} else {
-			fmt.Fprintf(&b, "  %s -> %s -> %s\n", probe.Local, probe.Mapped, probe.Remote)
+			fmt.Fprintf(&b, "    %s -> %s -> %s\n", probe.Local, probe.Mapped, probe.Remote)
 		}
 	}
 
@@ -54,7 +54,7 @@ func (r *Result) String() string {
 	} else {
 		fmt.Fprintf(&b, "Firewall probe with outbound traffic %s -> %s\n", r.FirewallProbes.Local, r.FirewallProbes.Remote)
 		for _, addr := range r.FirewallProbes.Received {
-			fmt.Fprintf(&b, "  %s\n", addr)
+			fmt.Fprintf(&b, "    %s\n", addr)
 		}
 	}
 
@@ -311,35 +311,35 @@ func (a *Analysis) Narrative() string {
 	switch {
 	case a.MappingVariesByDestPort && a.MappingVariesByDestIP:
 		ret = append(ret, `NAT allocates a new ip:port for every unique 5-tuple (protocol, source ip, source port, destination ip, destination port).
-  This makes NAT traversal more difficult.`)
+    This makes NAT traversal more difficult.`)
 	case a.MappingVariesByDestIP:
 		ret = append(ret, `NAT allocates a new ip:port for every unique IP 4-tuple (protocol, source ip, source port, destination ip).
-  This makes NAT traversal more difficult.`)
+    This makes NAT traversal more difficult.`)
 	case a.MappingVariesByDestPort:
 		ret = append(ret, `NAT allocates a new ip:port for every unique port 4-tuple (protocol, source ip, source port, destination port).
-  This is unusual!
-  This makes NAT traversal more difficult.`)
+    This is unusual!
+    This makes NAT traversal more difficult.`)
 	default:
 		ret = append(ret, `NAT allocates a new ip:port for every unique 3-tuple (protocol, source ip, source ports).
-  This is best practice for NAT devices.
-  This makes NAT traversal easier.`)
+    This is best practice for NAT devices.
+    This makes NAT traversal easier.`)
 	}
 
 	switch {
 	case a.FirewallEnforcesDestIP && a.FirewallEnforcesDestPort:
 		ret = append(ret, `Firewall requires outbound traffic to an ip:port before allowing inbound traffic from that ip:port.
-  This is common practice for NAT gateways.
-  This makes NAT traversal more difficult.`)
+    This is common practice for NAT gateways.
+    This makes NAT traversal more difficult.`)
 	case a.FirewallEnforcesDestIP:
 		ret = append(ret, `Firewall requires outbound traffic to an ip before allowing inbound traffic from that ip, but the ports don't have to match.
-  This makes NAT traversal more difficult.`)
+    This makes NAT traversal more difficult.`)
 	case a.FirewallEnforcesDestPort:
 		ret = append(ret, `Firewall requires outbound traffic to a port before allowing inbound traffic from that port, but the IPs don't have to match.
-  This is unusual!
-  This makes NAT traversal more difficult.`)
+    This is unusual!
+    This makes NAT traversal more difficult.`)
 	default:
 		ret = append(ret, `Firewall allows inbound traffic from any source, with no prerequisites.
-  This is best practice for "traversal-friendly" NAT devices.`)
+    This is best practice for "traversal-friendly" NAT devices.`)
 	}
 
 	if a.MappingPreservesSourcePort {
@@ -350,7 +350,7 @@ func (a *Analysis) Narrative() string {
 
 	if a.MultiplePublicIPs {
 		ret = append(ret, `NAT seems to use different public IPs for different mappings.
-  This makes NAT traversal more difficult.`)
+    This makes NAT traversal more difficult.`)
 	} else {
 		ret = append(ret, `NAT seems to only use one public IP for this client.`)
 	}

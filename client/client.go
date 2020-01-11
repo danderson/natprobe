@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"time"
 
@@ -75,24 +76,29 @@ func Probe(ctx context.Context, opts *Options) (*Result, error) {
 	}
 	dests := dests(ips, opts.Ports)
 
+	// Channel for the mapping probe to pass a working server to the firewall.
+	var (
+		workingAddr  = make(chan *net.UDPAddr, 1)
+		firewallDone = make(chan error)
+		firewall     *FirewallProbe
+	)
+
+	// If we get any successful mapping response, use that address for
+	// firewall probing.
+	go func() {
+		fw, err := probeFirewall(ctx, workingAddr, opts.FirewallDuration, opts.FirewallTransmitInterval)
+		firewall = fw
+		firewallDone <- err
+	}()
+
 	// Probe the NAT for its mapping behavior.
-	probes, err := probeMapping(ctx, dests, opts.MappingSockets, opts.MappingDuration, opts.MappingTransmitInterval)
+	probes, err := probeMapping(ctx, dests, opts.MappingSockets, opts.MappingDuration, opts.MappingTransmitInterval, workingAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	// If we got any successful mapping response, use that address for
-	// firewall probing.
-	var firewall *FirewallProbe
-	for _, probe := range probes {
-		if probe.Timeout {
-			continue
-		}
-		firewall, err = probeFirewall(ctx, probe.Remote, opts.FirewallDuration, opts.FirewallTransmitInterval)
-		if err != nil {
-			return nil, err
-		}
-		break
+	if err = <-firewallDone; err != nil {
+		return nil, err
 	}
 
 	return &Result{
@@ -111,7 +117,11 @@ func dests(ips []net.IP, ports []int) []*net.UDPAddr {
 	return ret
 }
 
-func probeFirewall(ctx context.Context, dest *net.UDPAddr, duration time.Duration, txInterval time.Duration) (*FirewallProbe, error) {
+func probeFirewall(ctx context.Context, workingAddr chan *net.UDPAddr, duration time.Duration, txInterval time.Duration) (*FirewallProbe, error) {
+	dest := <-workingAddr
+	if dest == nil {
+		return nil, fmt.Errorf("no working server addresses available for firewall probing")
+	}
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{})
 	if err != nil {
 		return nil, err
@@ -159,7 +169,9 @@ func probeFirewall(ctx context.Context, dest *net.UDPAddr, duration time.Duratio
 	}
 }
 
-func probeMapping(ctx context.Context, dests []*net.UDPAddr, sockets int, duration time.Duration, txInterval time.Duration) ([]*MappingProbe, error) {
+func probeMapping(ctx context.Context, dests []*net.UDPAddr, sockets int, duration time.Duration, txInterval time.Duration, workingAddr chan *net.UDPAddr) ([]*MappingProbe, error) {
+	defer close(workingAddr)
+
 	ctx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
 
@@ -172,7 +184,7 @@ func probeMapping(ctx context.Context, dests []*net.UDPAddr, sockets int, durati
 
 	for i := 0; i < sockets; i++ {
 		go func() {
-			res, err := probeOneMapping(ctx, dests, txInterval)
+			res, err := probeOneMapping(ctx, dests, txInterval, workingAddr)
 			done <- result{probes: res, err: err}
 		}()
 	}
@@ -189,7 +201,7 @@ func probeMapping(ctx context.Context, dests []*net.UDPAddr, sockets int, durati
 	return ret, nil
 }
 
-func probeOneMapping(ctx context.Context, dests []*net.UDPAddr, txInterval time.Duration) ([]*MappingProbe, error) {
+func probeOneMapping(ctx context.Context, dests []*net.UDPAddr, txInterval time.Duration, workingAddr chan *net.UDPAddr) ([]*MappingProbe, error) {
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{})
 	if err != nil {
 		return nil, err
@@ -258,6 +270,10 @@ func probeOneMapping(ctx context.Context, dests []*net.UDPAddr, txInterval time.
 			ret = append(ret, probe)
 			seen[probe.key()] = true
 			seenByDest[addr.String()] = true
+			select {
+			case workingAddr <- copyUDPAddr(addr):
+			default:
+			}
 		}
 	}
 }
