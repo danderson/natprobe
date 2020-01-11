@@ -89,7 +89,7 @@ func (s *server) handle(conn *net.UDPConn) error {
 			continue
 		}
 
-		varyAddr, varyPort := buf[0] == 1, buf[1] == 1
+		varyAddr, varyPort := buf[0]&1 != 0, buf[0]&2 != 0
 		var respConn *net.UDPConn
 		for _, c := range s.conns {
 			myaddr := conn.LocalAddr().(*net.UDPAddr)
