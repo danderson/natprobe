@@ -1,7 +1,7 @@
 .PHONY: all
 all:
 	go test ./...
-	(cd cli && CGO_ENABLED=0 go build .)
+	(cd cmd/natprobe && CGO_ENABLED=0 go build .)
 	(cd server && CGO_ENABLED=0 go build .)
 
 .PHONY: deploy
