@@ -9,18 +9,28 @@ import (
 	"go.universe.tf/natprobe/internal"
 )
 
-// Options configures the probe.
+// Options configures the probe. All zero values are replaced with
+// sensible defaults.
 type Options struct {
+	// The addresses of probe servers to use.
 	ServerAddrs []string
-	Ports       []int
+	// The ports to probe on the probe servers.
+	Ports []int
 
+	// How long server name resolution can take.
 	ResolveDuration time.Duration
 
-	MappingDuration         time.Duration
+	// How long the mapping phase takes.
+	MappingDuration time.Duration
+	// How frequently to send mapping probe packets for each socket
+	// and destination.
 	MappingTransmitInterval time.Duration
-	MappingSockets          int
+	// The number of sockets to use for probing.
+	MappingSockets int
 
-	FirewallDuration         time.Duration
+	// How long the firewall probing phase takes.
+	FirewallDuration time.Duration
+	// How frequently to send firewal probe packets for each socket.
 	FirewallTransmitInterval time.Duration
 }
 
