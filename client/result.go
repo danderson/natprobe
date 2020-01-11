@@ -301,8 +301,8 @@ type Analysis struct {
 	FilteredEgress []int
 }
 
-// Narrative returns a human-readable description of the analysis.
-func (a *Analysis) Narrative() string {
+// String returns a human-readable description of the analysis.
+func (a *Analysis) String() string {
 	if a.NoData {
 		return "Probing got no useful data at all. Either the probe servers are down, or extremely strict UDP filtering is in place on your LAN."
 	}

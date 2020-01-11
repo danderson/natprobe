@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -94,6 +95,16 @@ func main() {
 }
 
 func run(c *cli.Context) error {
+	var printer func(interface{})
+	switch c.String("format") {
+	case "text":
+		printer = textPrinter
+	case "json":
+		printer = jsonPrinter
+	default:
+		return fmt.Errorf("unknown --format value %q", c.String("format"))
+	}
+
 	opts := &client.Options{
 		ServerAddrs:              c.StringSlice("servers"),
 		Ports:                    c.IntSlice("ports"),
@@ -107,17 +118,29 @@ func run(c *cli.Context) error {
 
 	result, err := client.Probe(context.Background(), opts)
 	if err != nil {
-		logger.Error(err, "Probe failed")
+		return err
 	}
 
 	if c.Bool("anonymize-results") {
 		result.Anonymize()
 	}
 	if c.Bool("print-results") {
-		fmt.Println(result)
+		printer(result)
 	}
 	if c.Bool("print-analysis") {
-		fmt.Println(result.Analyze().Narrative())
+		printer(result.Analyze())
 	}
 	return nil
+}
+
+func textPrinter(obj interface{}) {
+	fmt.Println(obj)
+}
+
+func jsonPrinter(obj interface{}) {
+	bs, err := json.MarshalIndent(obj, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(bs))
 }
