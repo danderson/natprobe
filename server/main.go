@@ -2,13 +2,19 @@ package main
 
 import (
 	"encoding/binary"
+	"errors"
 	"flag"
+	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 	"go.universe.tf/natprobe/internal"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -16,59 +22,62 @@ var (
 )
 
 func main() {
+	flag.Parse()
+	logger := mkLogger()
+
+	server, err := newServer(logger)
+	if err != nil {
+		logger.Error(err, "Failed to create server")
+		os.Exit(1)
+	}
+
+	server.run()
+}
+
+func newServer(logger logr.Logger) (*server, error) {
 	ips, err := publicIPs()
 	if err != nil {
-		logrus.Fatalf("Couldn't list public IPs: %s", err)
+		return nil, fmt.Errorf("failed to enumerate local public IPs: %s", err)
 	}
 	if len(ips) < 2 {
-		logrus.Warn("Not enough public IPs available to provide a useful testing server")
+		return nil, errors.New("not enough public IPs to provide a useful testing server")
 	}
 
 	ports, err := parsePorts()
 	if err != nil {
-		logrus.Fatalf("Failed to parse ports: %s", err)
+		return nil, fmt.Errorf("failed to parse listening ports: %s", err)
 	}
 
-	server := &server{}
+	ret := &server{
+		logger: logger,
+	}
 
 	for _, ip := range ips {
 		for _, port := range ports {
 			addr := &net.UDPAddr{IP: ip, Port: port}
 			conn, err := net.ListenUDP("udp4", addr)
 			if err != nil {
-				logrus.Fatalf("Failed to listen on %s: %s", addr, err)
+				return nil, fmt.Errorf("failed to listen on %s: %s", addr, err)
 			}
-			server.conns = append(server.conns, conn)
-			logrus.Infof("Listening on %s", addr)
+			ret.conns = append(ret.conns, conn)
+			logger.Info("Created UDP listening port", "local-addr", addr.String())
 		}
 	}
 
-	for _, conn := range server.conns {
-		go server.handle(conn)
-	}
-
-	logrus.Info("Startup complete")
-	select {}
-}
-
-func parsePorts() ([]int, error) {
-	if *ports == "" {
-		return internal.Ports, nil
-	}
-
-	ret := []int{}
-	for _, port := range strings.Split(*ports, ",") {
-		i, err := strconv.Atoi(port)
-		if err != nil {
-			return nil, err
-		}
-		ret = append(ret, i)
-	}
 	return ret, nil
 }
 
 type server struct {
-	conns []*net.UDPConn
+	conns  []*net.UDPConn
+	logger logr.Logger
+}
+
+func (s *server) run() {
+	for _, conn := range s.conns {
+		go s.handle(conn)
+	}
+	s.logger.Info("Startup complete")
+	select {}
 }
 
 func (s *server) handle(conn *net.UDPConn) error {
@@ -76,10 +85,10 @@ func (s *server) handle(conn *net.UDPConn) error {
 	for {
 		n, addr, err := conn.ReadFromUDP(buf[:])
 		if err != nil {
-			logrus.Errorf("Reading on %s: %s", conn.LocalAddr(), err)
+			s.logger.Error(err, "Error reading from socket", "local-addr", conn.LocalAddr())
 		}
 		if n != 180 {
-			logrus.Infof("Received malformed %d byte packet from %s on %s", n, addr, conn.LocalAddr())
+			s.logger.Info("Ignoring packet of unexpected length", "local-addr", conn.LocalAddr(), "remote-addr", addr, "packet-size", n)
 			continue
 		}
 
@@ -101,12 +110,29 @@ func (s *server) handle(conn *net.UDPConn) error {
 		copy(buf[:16], addr.IP.To16())
 		binary.BigEndian.PutUint16(buf[16:18], uint16(addr.Port))
 		if _, err = respConn.WriteToUDP(buf[:18], addr); err != nil {
-			logrus.Errorf("Failed to send response to %s: %s", addr, err)
+			s.logger.Error(err, "Failed to send response", "remote-addr", addr)
 			continue
 		}
 
-		logrus.Infof("Provided NAT mapping to %s via %s (varyAddr=%t, varyPort=%t)", addr, respConn.LocalAddr(), varyAddr, varyPort)
+		s.logger.Info("Provided NAT mapping", "local-addr", respConn.LocalAddr(), "remote-addr", addr, "vary-addr", varyAddr, "vary-port", varyPort)
 	}
+}
+
+func mkLogger() logr.Logger {
+	var (
+		logger *zap.Logger
+		err    error
+	)
+	if isTerminal() {
+		logger, err = zap.NewDevelopment()
+	} else {
+		logger, err = zap.NewProduction()
+	}
+	if err != nil {
+		panic(fmt.Sprintf("Failed to initialize logger: %s", err))
+	}
+
+	return zapr.NewLogger(logger)
 }
 
 func publicIPs() ([]net.IP, error) {
@@ -134,9 +160,30 @@ func publicIPs() ([]net.IP, error) {
 	return ret, nil
 }
 
+func parsePorts() ([]int, error) {
+	if *ports == "" {
+		return internal.Ports, nil
+	}
+
+	ret := []int{}
+	for _, port := range strings.Split(*ports, ",") {
+		i, err := strconv.Atoi(port)
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, i)
+	}
+	return ret, nil
+}
+
 func isrfc1918(ip net.IP) bool {
 	ip = ip.To4()
 	return ip[0] == 10 ||
 		(ip[0] == 172 && ip[1]&0xf0 == 16) ||
 		(ip[0] == 192 && ip[1] == 168)
+}
+
+func isTerminal() bool {
+	_, err := unix.IoctlGetTermios(int(os.Stdout.Fd()), unix.TCGETS)
+	return err == nil
 }

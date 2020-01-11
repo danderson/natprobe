@@ -6,7 +6,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/go-logr/logr"
 	"go.universe.tf/natprobe/internal"
 )
 
@@ -23,8 +22,6 @@ type Options struct {
 
 	FirewallDuration         time.Duration
 	FirewallTransmitInterval time.Duration
-
-	Logger logr.Logger
 }
 
 func (o *Options) addDefaults() {

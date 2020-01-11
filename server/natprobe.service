@@ -8,10 +8,12 @@ WantedBy=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/opt/natprobe
+ExecStart=/natprobe
 Restart=always
 
 # Security settings
+RootDirectory=/opt
+MountAPIVFS=false
 DynamicUser=true
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
