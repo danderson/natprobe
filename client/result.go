@@ -33,6 +33,7 @@ type FirewallProbe struct {
 	Received []*net.UDPAddr
 }
 
+// String returns a human-readable description of the probe results.
 func (r *Result) String() string {
 	if len(r.MappingProbes) == 0 {
 		return "No data (did the probe fail?)"
@@ -93,6 +94,7 @@ func (r *Result) Anonymize() {
 	}
 }
 
+// Analyze distills raw results into an Analysis.
 func (r *Result) Analyze() *Analysis {
 	return &Analysis{
 		NoData:                     noData(r),
@@ -276,6 +278,7 @@ func filteredEgress(r *Result) []int {
 	return ret
 }
 
+// Analysis is a high level "feature" analysis of NAT behavior.
 type Analysis struct {
 	// There is no data to analyze.
 	NoData bool
@@ -298,6 +301,7 @@ type Analysis struct {
 	FilteredEgress []int
 }
 
+// Narrative returns a human-readable description of the analysis.
 func (a *Analysis) Narrative() string {
 	if a.NoData {
 		return "Probing got no useful data at all. Either the probe servers are down, or extremely strict UDP filtering is in place on your LAN."
