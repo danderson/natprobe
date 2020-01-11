@@ -317,7 +317,8 @@ func (a *Analysis) Narrative() string {
   This makes NAT traversal more difficult.`)
 	default:
 		ret = append(ret, `NAT allocates a new ip:port for every unique 3-tuple (protocol, source ip, source ports).
-  This is best practice for NAT devices.`)
+  This is best practice for NAT devices.
+  This makes NAT traversal easier.`)
 	}
 
 	switch {
