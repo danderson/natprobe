@@ -11,10 +11,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
 	"go.universe.tf/natprobe/internal"
-	"golang.org/x/sys/unix"
 )
 
 var (
@@ -23,7 +20,7 @@ var (
 
 func main() {
 	flag.Parse()
-	logger := mkLogger()
+	logger := internal.NewLogger()
 
 	server, err := newServer(logger)
 	if err != nil {
@@ -118,23 +115,6 @@ func (s *server) handle(conn *net.UDPConn) error {
 	}
 }
 
-func mkLogger() logr.Logger {
-	var (
-		logger *zap.Logger
-		err    error
-	)
-	if isTerminal() {
-		logger, err = zap.NewDevelopment()
-	} else {
-		logger, err = zap.NewProduction()
-	}
-	if err != nil {
-		panic(fmt.Sprintf("Failed to initialize logger: %s", err))
-	}
-
-	return zapr.NewLogger(logger)
-}
-
 func publicIPs() ([]net.IP, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -181,9 +161,4 @@ func isrfc1918(ip net.IP) bool {
 	return ip[0] == 10 ||
 		(ip[0] == 172 && ip[1]&0xf0 == 16) ||
 		(ip[0] == 192 && ip[1] == 168)
-}
-
-func isTerminal() bool {
-	_, err := unix.IoctlGetTermios(int(os.Stdout.Fd()), unix.TCGETS)
-	return err == nil
 }

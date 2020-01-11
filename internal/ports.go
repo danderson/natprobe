@@ -1,5 +1,7 @@
 package internal
 
+import "sort"
+
 // Ports are the default ports that both client and server use for probing.
 var Ports = []int{
 	// One more random port in the IANA "Dynamic Ports"
@@ -38,4 +40,8 @@ var Ports = []int{
 	5060,
 	// SIP TLS
 	5061,
+}
+
+func init() {
+	sort.Ints(Ports)
 }
