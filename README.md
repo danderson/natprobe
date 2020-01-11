@@ -1,7 +1,8 @@
 natprobe is a Go toolkit to probe the behavior of NAT devices. It includes:
 
- - `go.universe.tf/natprobe/client`: a Go library to probe for the
-   presence and behavior of a NAT device.
+ - [`go.universe.tf/natprobe/client`](https://godoc.org/go.universe.tf/natprobe/client):
+   a Go library to probe for the presence and behavior of a NAT
+   device.
  - `go.universe.tf/natprobe/cli`: a thin CLI wrapper around the client
    library.
  - `go.universe.tf/natprobe/server`: a server that provides mapping
