@@ -215,32 +215,15 @@ func probeMapping(ctx context.Context, dests []*net.UDPAddr, sockets int, durati
 	return ret, nil
 }
 
-func probeOneMapping(ctx context.Context, dests []*net.UDPAddr, txInterval time.Duration, workingAddr chan *net.UDPAddr) ([]*MappingProbe, error) {
+func probeOneMapping(ctx context.Context, dests []*net.UDPAddr, txInterval time.Duration, workingAddr chan *net.UDPAddr) (ret []*MappingProbe, err error) {
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{})
 	if err != nil {
 		return nil, err
 	}
-
-	var (
-		seenByDest = map[string]bool{}
-		ret        = []*MappingProbe{}
-	)
+	defer conn.Close()
 
 	ctx, cancel := context.WithCancel(ctx)
-	defer func() {
-		cancel()
-		conn.Close()
-
-		for _, dest := range dests {
-			if !seenByDest[dest.String()] {
-				ret = append(ret, &MappingProbe{
-					Local:   copyUDPAddr(conn.LocalAddr().(*net.UDPAddr)),
-					Remote:  copyUDPAddr(dest),
-					Timeout: true,
-				})
-			}
-		}
-	}()
+	defer cancel()
 
 	deadline, ok := ctx.Deadline()
 	if !ok {
@@ -257,10 +240,20 @@ func probeOneMapping(ctx context.Context, dests []*net.UDPAddr, txInterval time.
 		seen = map[string]bool{}
 	)
 
+	seenByDest := map[string]bool{}
 	for {
 		n, addr, err := conn.ReadFromUDP(buf[:])
 		if err != nil {
 			if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+				for _, dest := range dests {
+					if !seenByDest[dest.String()] {
+						ret = append(ret, &MappingProbe{
+							Local:   copyUDPAddr(conn.LocalAddr().(*net.UDPAddr)),
+							Remote:  copyUDPAddr(dest),
+							Timeout: true,
+						})
+					}
+				}
 				return ret, nil
 			}
 			return nil, err

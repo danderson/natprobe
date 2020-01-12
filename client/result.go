@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -393,6 +394,18 @@ func (a *Analysis) String() string {
     This makes NAT traversal more difficult.`)
 	} else {
 		ret = append(ret, `NAT seems to only use one public IP for this client.`)
+	}
+
+	switch len(a.FilteredEgress) {
+	case 0:
+	case 1:
+		ret = append(ret, fmt.Sprintf("Outbound UDP port %d seems to be blocked.", a.FilteredEgress[0]))
+	default:
+		ports := []string{}
+		for _, p := range a.FilteredEgress {
+			ports = append(ports, strconv.Itoa(p))
+		}
+		ret = append(ret, fmt.Sprintf("Outbound UDP ports %s seem to be blocked.", strings.Join(ports, ", ")))
 	}
 
 	return strings.Join(ret, "\n")
