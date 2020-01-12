@@ -10,6 +10,7 @@ import (
 
 // Result is the raw, uninterpreted result of a probe.
 type Result struct {
+	LocalIPs       []net.IP
 	MappingProbes  []*MappingProbe
 	FirewallProbes *FirewallProbe
 }
@@ -40,6 +41,12 @@ func (r *Result) String() string {
 	}
 
 	var b bytes.Buffer
+
+	b.WriteString("Local IPs on the client:\n")
+	for _, ip := range r.LocalIPs {
+		fmt.Fprintf(&b, "    %s\n", ip)
+	}
+
 	b.WriteString("Mapping probes:\n")
 	for _, probe := range r.MappingProbes {
 		if probe.Timeout {
@@ -67,6 +74,11 @@ func (r *Result) Anonymize() {
 	a, b := byte(1), byte(1)
 
 	anonymize := func(ip net.IP) net.IP {
+		if len(ip) == 0 || ip.IsUnspecified() {
+			// Nothing to anonymize.
+			return ip
+		}
+
 		if ret := ips[ip.String()]; ret != nil {
 			return ret
 		}
@@ -79,6 +91,9 @@ func (r *Result) Anonymize() {
 		return ret
 	}
 
+	for i, ip := range r.LocalIPs {
+		r.LocalIPs[i] = anonymize(ip)
+	}
 	for _, probe := range r.MappingProbes {
 		probe.Local.IP = anonymize(probe.Local.IP)
 		probe.Mapped.IP = anonymize(probe.Mapped.IP)
@@ -98,6 +113,7 @@ func (r *Result) Anonymize() {
 func (r *Result) Analyze() *Analysis {
 	return &Analysis{
 		NoData:                     noData(r),
+		NoNAT:                      noNAT(r),
 		MappingVariesByDestIP:      mappingVariesByDestIP(r),
 		MappingVariesByDestPort:    mappingVariesByDestPort(r),
 		FirewallEnforcesDestIP:     firewallEnforcesDestIP(r),
@@ -117,6 +133,23 @@ func noData(r *Result) bool {
 			return false
 		}
 	}
+	return true
+}
+
+func noNAT(r *Result) bool {
+	ips := map[string]bool{}
+	for _, ip := range r.LocalIPs {
+		ips[ip.String()] = true
+	}
+	for _, probe := range r.MappingProbes {
+		if probe.Timeout {
+			continue
+		}
+		if !ips[probe.Mapped.IP.String()] {
+			return false
+		}
+	}
+
 	return true
 }
 
@@ -282,6 +315,8 @@ func filteredEgress(r *Result) []int {
 type Analysis struct {
 	// There is no data to analyze.
 	NoData bool
+	// There is no NAT, at least one local IP appears to be a public IP.
+	NoNAT bool
 	// Assigned public ip:port depends on the destination IP.
 	MappingVariesByDestIP bool
 	// Assigned public ip:port depends on the destination port.
@@ -306,6 +341,11 @@ func (a *Analysis) String() string {
 	if a.NoData {
 		return "Probing got no useful data at all. Either the probe servers are down, or extremely strict UDP filtering is in place on your LAN."
 	}
+
+	if a.NoNAT {
+		return "There doesn't seem to be a NAT between you and the internet. Good for you!"
+	}
+
 	ret := []string{}
 
 	switch {

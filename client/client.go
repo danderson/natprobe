@@ -69,6 +69,19 @@ func Probe(ctx context.Context, opts *Options) (*Result, error) {
 	}
 	opts.addDefaults()
 
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, fmt.Errorf("enumerating local addresses: %s", err)
+	}
+	var localIPs []net.IP
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok {
+			if ipnet.IP.To4() != nil {
+				localIPs = append(localIPs, ipnet.IP)
+			}
+		}
+	}
+
 	// Assemble destination UDP addresses.
 	ips, err := resolveServerAddrs(ctx, opts.ServerAddrs, opts.ResolveDuration)
 	if err != nil {
@@ -102,6 +115,7 @@ func Probe(ctx context.Context, opts *Options) (*Result, error) {
 	}
 
 	return &Result{
+		LocalIPs:       localIPs,
 		MappingProbes:  probes,
 		FirewallProbes: firewall,
 	}, nil
