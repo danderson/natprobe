@@ -14,13 +14,13 @@ By default, the client talk to two courtesy servers at
 Sample output from the CLI:
 
 ```
-$ ./cli
+$ ./cmd/natprobe/natprobe
 NAT allocates a new ip:port for every unique 3-tuple (protocol, source ip, source ports).
-  This is best practice for NAT devices.
-  This makes NAT traversal easier.
+    This is best practice for NAT devices.
+    This makes NAT traversal easier.
 Firewall requires outbound traffic to an ip:port before allowing inbound traffic from that ip:port.
-  This is common practice for NAT gateways.
-  This makes NAT traversal more difficult.
+    This is common practice for NAT gateways.
+    This makes NAT traversal more difficult.
 NAT seems to try and make the public port number match the LAN port number.
 NAT seems to only use one public IP for this client.
 ```
