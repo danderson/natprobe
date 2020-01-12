@@ -37,7 +37,7 @@ type Options struct {
 
 func (o *Options) addDefaults() {
 	if len(o.ServerAddrs) == 0 {
-		o.ServerAddrs = []string{"natprobe1.universe.tf.", "natprobe2.universe.tf."}
+		o.ServerAddrs = []string{"natprobe1-4.universe.tf.", "natprobe2-4.universe.tf."}
 	}
 	if len(o.Ports) == 0 {
 		o.Ports = internal.Ports
