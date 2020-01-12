@@ -28,6 +28,6 @@ func NewLogger() logr.Logger {
 }
 
 func isTerminal() bool {
-	_, err := unix.IoctlGetTermios(int(os.Stdout.Fd()), unix.TCGETS)
+	_, err := unix.IoctlGetTermios(int(os.Stdout.Fd()), 0)
 	return err == nil
 }
